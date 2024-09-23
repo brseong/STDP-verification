@@ -36,7 +36,7 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     def f_post(x, w_max, alpha=0.) -> float: pass
     
     
-class Diehl2015(STDPNet):
+class DiehlAndCook2015(STDPNet):
     draw_ids = (0,1)
     def __init__(
         self, in_features:int,
@@ -66,9 +66,11 @@ class Diehl2015(STDPNet):
             self.learners.append(
                 learning.STDPLearner(step_mode='s', synapse=linear, sn=self.lif_hidden, 
                                         tau_pre=tau_pre, tau_post=tau_post,
-                                        f_pre=Diehl2015.f_weight, f_post=Diehl2015.f_weight)
+                                        f_pre=DiehlAndCook2015.f_weight, f_post=DiehlAndCook2015.f_weight)
             )
     
+    ### TODO: In order to balance the network minimizing the risk of neurons totally dominating the output, neurons should have approximately the same firing rates.
+    ### This can be achieved by increasing the threshold for a neuron once it fires and have it slowly decay to some resting value over time.
     def forward(self, x:torch.Tensor) -> torch.Tensor:
         assert x[0].reshape(-1).shape[0] == self.in_features, f"{x[0].reshape(-1).shape[0]}, {self.in_features}"
         excitatory = self.lif_hidden(self.excitatory(x)) # excitation from input
