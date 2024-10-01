@@ -1,11 +1,24 @@
 import torch
 from torch import nn
 from typeguard import typechecked
-from typing import cast
+from typing import Callable, cast
 from abc import abstractmethod, ABCMeta
+
+from utils.spikingjelly.spikingjelly.activation_based.surrogate import Sigmoid
 from .types import Tensor2D
 from .dataclasses import DistInfo
 from .spikingjelly.spikingjelly.activation_based import layer, learning, neuron
+
+def stdp_DiehlAndCook2015():
+    pass
+
+class LIFNeuron(neuron.SimpleLIFNode):
+    def __init__(self, tau: float, decay_input: bool, v_threshold: float = 1,
+                 v_reset: float = 0, surrogate_function: Callable = neuron.surrogate.Sigmoid(),
+                 detach_reset: bool = False, step_mode='s'):
+        super().__init__(tau, decay_input, v_threshold, v_reset, surrogate_function, detach_reset, step_mode)
+    def neuronal_charge(self, x:torch.Tensor):
+        return super().neuronal_charge(x)
 
 class STDPNet(nn.Module, metaclass=ABCMeta):
     learners:list[learning.STDPLearner] = NotImplemented
@@ -35,7 +48,10 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     @abstractmethod
     def f_post(x, w_max, alpha=0.) -> float: pass
     
-    
+class Kheradpisheh(STDPNet):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
 class DiehlAndCook2015(STDPNet):
     draw_ids = (0,1)
     def __init__(
@@ -68,6 +84,8 @@ class DiehlAndCook2015(STDPNet):
                                         tau_pre=tau_pre, tau_post=tau_post,
                                         f_pre=DiehlAndCook2015.f_weight, f_post=DiehlAndCook2015.f_weight)
             )
+            
+        
     
     ### TODO: In order to balance the network minimizing the risk of neurons totally dominating the output, neurons should have approximately the same firing rates.
     ### This can be achieved by increasing the threshold for a neuron once it fires and have it slowly decay to some resting value over time.

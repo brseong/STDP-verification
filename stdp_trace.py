@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from spikingjelly.activation_based import neuron, layer, learning
+from utils.spikingjelly.spikingjelly.activation_based import neuron, layer, learning, monitor
 from matplotlib import pyplot as plt
+from torchtyping import TensorType
 
 def f_weight(x):
     return torch.clamp(x, -1, 1.)
@@ -25,7 +26,7 @@ if __name__ == '__main__':
     lr = 0.01
     net = nn.Sequential(
         layer.Linear(N_in, N_out, bias=False),
-        neuron.IFNode()
+        neuron.LIFNode(store_v_seq=True)
     )
     nn.init.constant_(net[0].weight.data, 0.4)
     optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.)
@@ -34,6 +35,8 @@ if __name__ == '__main__':
     learner = learning.STDPLearner(step_mode='s', synapse=net[0], sn=net[1], 
                                    tau_pre=tau_pre, tau_post=tau_post,
                                    f_pre=f_weight, f_post=f_weight)
+    
+    v_monitor = monitor.AttributeMonitor("v", pre_forward=False, net=net, instance=neuron.LIFNode)
 
     out_spike = []
     trace_pre = []
@@ -64,35 +67,46 @@ if __name__ == '__main__':
     weight = weight[:, 0, 0]
 
     cmap = plt.get_cmap('tab10')
-    plt.subplot(5, 1, 1)
+    plt.subplot(6, 1, 1)
     plt.eventplot((in_spike * t)[in_spike == 1], lineoffsets=0, colors=cmap(0))
     plt.xlim(-0.5, T + 0.5)
     plt.ylabel('$s[i]$', rotation=0, labelpad=10)
     plt.xticks([])
     plt.yticks([])
 
-    plt.subplot(5, 1, 2)
+    plt.subplot(6, 1, 2)
     plt.plot(t, trace_pre, c=cmap(1))
     plt.xlim(-0.5, T + 0.5)
     plt.ylabel('$tr_{pre}$', rotation=0)
     plt.yticks([trace_pre.min().item(), trace_pre.max().item()])
     plt.xticks([])
 
-    plt.subplot(5, 1, 3)
+    import pdb
+    pdb.set_trace()
+    v_rec_list:list[TensorType["batch", 3]] = v_monitor.records # list is over timestep.
+    v_rec = torch.stack(v_rec_list)
+    first_node_v_rec = v_rec[:, 0, 0]
+    plt.subplot(6, 1, 3)
+    plt.plot(first_node_v_rec.detach().numpy())
+    plt.ylabel('$v[i]$', rotation=0, labelpad=10)
+    plt.xticks([])
+    plt.yticks([])
+    
+    plt.subplot(6, 1, 4)
     plt.eventplot((out_spike * t)[out_spike == 1], lineoffsets=0, colors=cmap(2))
     plt.xlim(-0.5, T + 0.5)
     plt.ylabel('$s[j]$', rotation=0, labelpad=10)
     plt.xticks([])
     plt.yticks([])
 
-    plt.subplot(5, 1, 4)
+    plt.subplot(6, 1, 5)
     plt.plot(t, trace_post, c=cmap(3))
     plt.ylabel('$tr_{post}$', rotation=0)
     plt.yticks([trace_post.min().item(), trace_post.max().item()])
     plt.xlim(-0.5, T + 0.5)
     plt.xticks([])
 
-    plt.subplot(5, 1, 5)
+    plt.subplot(6, 1, 6)
     plt.plot(t, weight, c=cmap(4))
     plt.xlim(-0.5, T + 0.5)
     plt.ylabel('$w[i][j]$', rotation=0)
@@ -101,5 +115,4 @@ if __name__ == '__main__':
     
     plt.gcf().subplots_adjust(left=0.18)
     
-    plt.show()
     plt.savefig('./stdp_trace.pdf')

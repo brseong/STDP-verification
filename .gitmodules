@@ -1,3 +1,6 @@
 [submodule "utils/spikingjelly"]
 	path = utils/spikingjelly
 	url = https://github.com/sizzflair97/spikingjelly.git
+[submodule "utils/SpykeTorch"]
+	path = utils/SpykeTorch
+	url = https://github.com/sizzflair97/SpykeTorch.git
