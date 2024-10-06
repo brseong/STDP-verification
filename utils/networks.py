@@ -2,19 +2,23 @@ import torch
 
 from torch import nn
 from torch.nn import Parameter
-from typeguard import typechecked
-from typing import Callable, cast
-from abc import abstractmethod, ABCMeta
+from torchvision import transforms
+import matplotlib.pyplot as plt
 
-from utils.spikingjelly.spikingjelly.activation_based.surrogate import Sigmoid
-from .types import Tensor2D
-from .dataclasses import DistInfo
 from .spikingjelly.spikingjelly.activation_based import layer, learning, neuron
-from .SpykeTorch.SpykeTorch import snn
+from .spikingjelly.spikingjelly.activation_based.surrogate import Sigmoid
+
+from .SpykeTorch.SpykeTorch import snn, utils
 from .SpykeTorch.SpykeTorch import functional as sf
 
-def stdp_DiehlAndCook2015():
-    pass
+from typeguard import typechecked
+from typing import Any, Callable, Generator, cast
+from abc import abstractmethod, ABCMeta
+
+from .types import Tensor2D
+from .dataclasses import DistInfo
+from .visual import draw_tensor, tensor2img
+
 
 class LIFNeuron(neuron.SimpleLIFNode):
     def __init__(self, tau: float, decay_input: bool, v_threshold: float = 1,
@@ -27,18 +31,15 @@ class LIFNeuron(neuron.SimpleLIFNode):
 class STDPNet(nn.Module, metaclass=ABCMeta):
     learners:list[learning.STDPLearner] = NotImplemented
     draw_ids:tuple[int, ...] = NotImplemented
-        
-    # def gen_block(self, in_features:int, out_features:int, **kwargs) -> nn.Sequential:
-    #     return nn.Sequential(
-    #         layer.Linear(in_features, out_features, **kwargs),
-    #         neuron.LIFNode()
-    #     )
-
+    
     @abstractmethod
     def post_optim(self) -> None: pass
     
     @abstractmethod
     def draw_weights(self, id:int=0) -> Tensor2D: pass
+    
+    @abstractmethod
+    def trainer(self) -> Generator: pass
     
     @staticmethod
     @abstractmethod
@@ -167,11 +168,43 @@ class Mozafari2018(STDPNet):
     def punish(self):
         self.anti_stdp3(self.ctx["input_spikes"], self.ctx["potentials"], self.ctx["output_spikes"], self.ctx["winners"])
     
+    def trainer(self) -> Generator[Any, None, None]:
+        raise NotImplementedError
+    
     def post_optim(self) -> None:
         pass
     
+    def generate_transform(self):
+        class S1C1Transform:
+            def __init__(self, filter:utils.Filter, timesteps = 15):
+                self.to_tensor = transforms.ToTensor()
+                self.filter = filter
+                self.temporal_transform = utils.Intensity2Latency(timesteps)
+                self.cnt = 0
+            def __call__(self, image):
+                if self.cnt % 1000 == 0:
+                    print(self.cnt)
+                self.cnt+=1
+                image = self.to_tensor(image) * 255
+                image.unsqueeze_(0)
+                image = self.filter(image)
+                image = sf.local_normalization(image, 8)
+                temporal_image = self.temporal_transform(image)
+                return temporal_image.sign().byte()
+
+        kernels = [ utils.DoGKernel(3,3/9,6/9),
+                    utils.DoGKernel(3,6/9,3/9),
+                    utils.DoGKernel(7,7/9,14/9),
+                    utils.DoGKernel(7,14/9,7/9),
+                    utils.DoGKernel(13,13/9,26/9),
+                    utils.DoGKernel(13,26/9,13/9)]
+        filter = utils.Filter(kernels, padding = 6, thresholds = 50)
+        s1c1 = S1C1Transform(filter)
+    
     def draw_weights(self, id:int=0) -> Tensor2D:
-        pass
+        assert id in range(3)
+        weight = [self.conv1, self.conv2, self.conv3][id].weight
+        return cast(Tensor2D, tensor2img(weight.detach().clone(), allkernels=True))
     
     @staticmethod
     def f_weight(x) -> torch.Tensor:
@@ -227,6 +260,9 @@ class DiehlAndCook2015(STDPNet):
         excitatory = self.lif_hidden(self.excitatory(x)) # excitation from input
         inhibitory = self.lif_hidden(self.inhibitory(excitatory)) # lateral inhibition
         return excitatory
+    
+    def trainer(self) -> Generator[Any, None, None]:
+        raise NotImplementedError
     
     def post_optim(self) -> None:
         self.excitatory.weight.data.clamp_(self.w_info.min, self.w_info.max)

@@ -37,7 +37,7 @@ if __name__ == '__main__':
                                    f_pre=f_weight, f_post=f_weight)
     
     v_monitor = monitor.AttributeMonitor("v", pre_forward=False, net=net, instance=neuron.LIFNode)
-
+    
     out_spike = []
     trace_pre = []
     trace_post = []

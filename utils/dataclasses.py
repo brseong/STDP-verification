@@ -8,3 +8,7 @@ class DistInfo:
     max:float = NotImplemented
     mean:float = NotImplemented
     std:float = NotImplemented
+    
+@dataclass
+class ExpInfo:
+    use_cuda:bool = True
