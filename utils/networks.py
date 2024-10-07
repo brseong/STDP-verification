@@ -17,7 +17,7 @@ from abc import abstractmethod, ABCMeta
 
 from .types import Tensor2D
 from .dataclasses import DistInfo
-from .visual import draw_tensor, tensor2img
+from .visual import draw_tensors, tensor2img
 
 
 class LIFNeuron(neuron.SimpleLIFNode):
@@ -38,9 +38,6 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     @abstractmethod
     def draw_weights(self, id:int=0) -> Tensor2D: pass
     
-    @abstractmethod
-    def trainer(self) -> Generator: pass
-    
     @staticmethod
     @abstractmethod
     def f_weight(x) -> torch.Tensor: pass
@@ -54,6 +51,7 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     def f_post(x, w_max, alpha=0.) -> float: pass
     
 class Mozafari2018(STDPNet):
+    draw_ids = (0,1,2)
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         
@@ -83,7 +81,7 @@ class Mozafari2018(STDPNet):
         self.spk_cnt1 = 0
         self.spk_cnt2 = 0
         
-    def forward(self, input, max_layer):
+    def forward(self, input:torch.Tensor, max_layer:int):
         input = sf.pad(input.float(), (2,2,2,2), 0)
         if self.training:
             pot = self.conv1(input)
@@ -168,13 +166,16 @@ class Mozafari2018(STDPNet):
     def punish(self):
         self.anti_stdp3(self.ctx["input_spikes"], self.ctx["potentials"], self.ctx["output_spikes"], self.ctx["winners"])
     
-    def trainer(self) -> Generator[Any, None, None]:
-        raise NotImplementedError
-    
     def post_optim(self) -> None:
         pass
     
-    def generate_transform(self):
+    def draw_weights(self, id:int=0) -> Tensor2D:
+        assert id in self.draw_ids
+        weight = [self.conv1, self.conv2, self.conv3][id].weight
+        return cast(Tensor2D, tensor2img(weight.detach().clone(), allkernels=True))
+    
+    @staticmethod
+    def generate_transform():
         class S1C1Transform:
             def __init__(self, filter:utils.Filter, timesteps = 15):
                 self.to_tensor = transforms.ToTensor()
@@ -199,12 +200,7 @@ class Mozafari2018(STDPNet):
                     utils.DoGKernel(13,13/9,26/9),
                     utils.DoGKernel(13,26/9,13/9)]
         filter = utils.Filter(kernels, padding = 6, thresholds = 50)
-        s1c1 = S1C1Transform(filter)
-    
-    def draw_weights(self, id:int=0) -> Tensor2D:
-        assert id in range(3)
-        weight = [self.conv1, self.conv2, self.conv3][id].weight
-        return cast(Tensor2D, tensor2img(weight.detach().clone(), allkernels=True))
+        return S1C1Transform(filter)
     
     @staticmethod
     def f_weight(x) -> torch.Tensor:
@@ -260,9 +256,6 @@ class DiehlAndCook2015(STDPNet):
         excitatory = self.lif_hidden(self.excitatory(x)) # excitation from input
         inhibitory = self.lif_hidden(self.inhibitory(excitatory)) # lateral inhibition
         return excitatory
-    
-    def trainer(self) -> Generator[Any, None, None]:
-        raise NotImplementedError
     
     def post_optim(self) -> None:
         self.excitatory.weight.data.clamp_(self.w_info.min, self.w_info.max)
