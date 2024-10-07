@@ -17,7 +17,7 @@ from abc import abstractmethod, ABCMeta
 
 from .types import Tensor2D
 from .dataclasses import DistInfo
-from .visual import draw_tensors, tensor2img
+from .visual import tensor2img
 
 
 class LIFNeuron(neuron.SimpleLIFNode):
@@ -51,7 +51,7 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     def f_post(x, w_max, alpha=0.) -> float: pass
     
 class Mozafari2018(STDPNet):
-    draw_ids = (0,1,2)
+    draw_ids = (0, 1, 2)
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         
@@ -171,8 +171,8 @@ class Mozafari2018(STDPNet):
     
     def draw_weights(self, id:int=0) -> Tensor2D:
         assert id in self.draw_ids
-        weight = [self.conv1, self.conv2, self.conv3][id].weight
-        return cast(Tensor2D, tensor2img(weight.detach().clone(), allkernels=True))
+        weight = [self.conv1, self.conv2, self.conv3][id].weight.cpu().detach().clone()
+        return cast(Tensor2D, tensor2img(weight, allkernels=True))
     
     @staticmethod
     def generate_transform():

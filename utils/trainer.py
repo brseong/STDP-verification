@@ -8,11 +8,12 @@ from .SpykeTorch.SpykeTorch import utils
 from .networks import Mozafari2018
 from .dataclasses import ExpInfo
 from .functions import Mozafari_train_rl, Mozafari_test, Mozafari_train_unsupervise
+from .types import Tensor2D
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-def train_Mozafari() -> Generator:
+def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     data_root = "data"
     s1c1 = Mozafari2018.generate_transform()
     MNIST_train = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=True, download=True, transform = s1c1))
@@ -21,9 +22,10 @@ def train_Mozafari() -> Generator:
     MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), shuffle=False)
 
     mozafari = Mozafari2018()
+    def draw_all_weights(): return tuple(mozafari.draw_weights(i) for i in range(3))
     if ExpInfo.use_cuda:
         mozafari.cuda()
-
+    
     # Training The First Layer
     print("Training the first layer")
     if os.path.isfile("saved_l1.net"):
@@ -35,7 +37,7 @@ def train_Mozafari() -> Generator:
             for data,targets in MNIST_loader:
                 print("Iteration", iter)
                 Mozafari_train_unsupervise(mozafari, data, 1)
-                yield mozafari.draw_weights(0)
+                yield draw_all_weights()
                 print("Done!")
                 iter+=1
         torch.save(mozafari.state_dict(), "saved_l1.net")
@@ -50,7 +52,7 @@ def train_Mozafari() -> Generator:
             for data,targets in MNIST_loader:
                 print("Iteration", iter)
                 Mozafari_train_unsupervise(mozafari, data, 2)
-                yield mozafari.draw_weights(1)
+                yield draw_all_weights()
                 print("Done!")
                 iter+=1
         torch.save(mozafari.state_dict(), "saved_l2.net")
@@ -79,7 +81,7 @@ def train_Mozafari() -> Generator:
         perf_train = np.array([0.0,0.0,0.0])
         for data,targets in MNIST_loader:
             perf_train_batch = Mozafari_train_rl(mozafari, data, targets)
-            yield mozafari.draw_weights(2)
+            yield draw_all_weights()
             print(perf_train_batch)
             #update adaptive learning rates
             apr_adapt = apr * (perf_train_batch[1] * adaptive_int + adaptive_min)
