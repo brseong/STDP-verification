@@ -4,3 +4,6 @@
 [submodule "utils/SpykeTorch"]
 	path = utils/SpykeTorch
 	url = https://github.com/sizzflair97/SpykeTorch.git
+[submodule "utils/z3"]
+	path = utils/z3
+	url = https://github.com/Z3Prover/z3.git
