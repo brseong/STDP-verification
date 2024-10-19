@@ -1,13 +1,12 @@
 import torch
 import numpy as np
-from tqdm.auto import tqdm
 
 from .dataclasses import ExpInfo
 from .networks import STDPNet, Mozafari2018
 
-def Mozafari_train_unsupervised(network:Mozafari2018, data:torch.Tensor, layer_idx:int):
+def Mozafari_train_unsupervise(network:Mozafari2018, data:torch.Tensor, layer_idx:int):
     network.train()
-    for i in tqdm(range(len(data))):
+    for i in range(len(data)):
         data_in = data[i]
         if ExpInfo.use_cuda:
             data_in = data_in.cuda()
@@ -17,7 +16,7 @@ def Mozafari_train_unsupervised(network:Mozafari2018, data:torch.Tensor, layer_i
 def Mozafari_train_rl(network:Mozafari2018, data:torch.Tensor, target:torch.Tensor):
     network.train()
     perf = np.array([0,0,0]) # correct, wrong, silence
-    for i in tqdm(range(len(data))):
+    for i in range(len(data)):
         data_in = data[i]
         target_in = target[i]
         if ExpInfo.use_cuda:
@@ -38,7 +37,7 @@ def Mozafari_train_rl(network:Mozafari2018, data:torch.Tensor, target:torch.Tens
 def Mozafari_test(network:Mozafari2018, data:torch.Tensor, target:torch.Tensor):
     network.eval()
     perf = np.array([0,0,0]) # correct, wrong, silence
-    for i in tqdm(range(len(data))):
+    for i in range(len(data)):
         data_in = data[i]
         target_in = target[i]
         if ExpInfo.use_cuda:

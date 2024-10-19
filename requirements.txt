@@ -9,3 +9,4 @@ mnist
 torchtyping
 jax
 jaxtyping
+z3-solver

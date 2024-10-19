@@ -7,13 +7,13 @@ from .SpykeTorch.SpykeTorch import utils
 
 from .networks import Mozafari2018
 from .dataclasses import ExpInfo
-from .functions import Mozafari_train_rl, Mozafari_test, Mozafari_train_unsupervised
-from .types import TensorImage, MNIST_DoG_Data, MNIST_DoG_Target
+from .functions import Mozafari_train_rl, Mozafari_test, Mozafari_train_unsupervise
+from .types import Tensor2D, MNIST_DoG_Data, MNIST_DoG_Target
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-def train_Mozafari() -> Generator[tuple[TensorImage,...], None, None]:
+def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     data_root = "data"
     s1c1 = Mozafari2018.generate_transform()
     MNIST_train = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=True, download=True, transform = s1c1))
@@ -22,7 +22,7 @@ def train_Mozafari() -> Generator[tuple[TensorImage,...], None, None]:
     MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), shuffle=False)
 
     mozafari = Mozafari2018()
-    def draw_all_weights(): return (mozafari.draw_weights(0),mozafari.draw_weights(1))
+    def draw_all_weights(): return (mozafari.draw_weights(0),mozafari.draw_weights(1),mozafari.draw_weights(2))
     if ExpInfo.use_cuda:
         mozafari.cuda()
         
@@ -33,33 +33,33 @@ def train_Mozafari() -> Generator[tuple[TensorImage,...], None, None]:
     # Training The First Layer
     print("Training the first layer")
     if os.path.isfile("saved_l1.net"):
-        mozafari.load_state_dict(torch.load("saved/saved_l1.net"))
+        mozafari.load_state_dict(torch.load("saved_l1.net"))
     else:
         for epoch in range(2):
             print("Epoch", epoch)
             iter = 0
             for data,targets in MNIST_loader:
                 print("Iteration", iter)
-                Mozafari_train_unsupervised(mozafari, data, 1)
+                Mozafari_train_unsupervise(mozafari, data, 1)
                 yield draw_all_weights()
                 print("Done!")
                 iter+=1
-        torch.save(mozafari.state_dict(), "saved/saved_l1.net")
+        torch.save(mozafari.state_dict(), "saved_l1.net")
     # Training The Second Layer
     print("Training the second layer")
     if os.path.isfile("saved_l2.net"):
-        mozafari.load_state_dict(torch.load("saved/saved_l2.net"))
+        mozafari.load_state_dict(torch.load("saved_l2.net"))
     else:
         for epoch in range(4):
             print("Epoch", epoch)
             iter = 0
             for data,targets in MNIST_loader:
                 print("Iteration", iter)
-                Mozafari_train_unsupervised(mozafari, data, 2)
+                Mozafari_train_unsupervise(mozafari, data, 2)
                 yield draw_all_weights()
                 print("Done!")
                 iter+=1
-        torch.save(mozafari.state_dict(), "saved/saved_l2.net")
+        torch.save(mozafari.state_dict(), "saved_l2.net")
 
     # initial adaptive learning rates
     apr = mozafari.stdp3.learning_rate[0][0].item()
@@ -105,6 +105,6 @@ def train_Mozafari() -> Generator[tuple[TensorImage,...], None, None]:
             perf_test = Mozafari_test(mozafari, data, targets)
             if best_test[0] <= perf_test[0]:
                 best_test = np.append(perf_test, epoch)
-                torch.save(mozafari.state_dict(), "saved/saved.net")
+                torch.save(mozafari.state_dict(), "saved.net")
             print(" Current Test:", perf_test)
             print("    Best Test:", best_test)

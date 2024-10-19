@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import _axes
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from .types import Tensor2D, Tensor4D, TensorImage
+from .types import Tensor2D, Tensor4D, Image
 
-def conv_weight2img(tensor:Tensor4D, ch:int=0, allkernels:bool=False, nrow:int=8, padding:int=1) -> TensorImage:
+def conv_weight2img(tensor:Tensor4D, ch:int=0, allkernels:bool=False, nrow:int=8, padding:int=1) -> Image:
+    assert tensor.shape[1] == 3 # The number of channels must be 3.
     n,c,w,h = tensor.shape
 
     if allkernels: tensor = tensor.view(n*c, -1, w, h)
-    elif c != 3 and n*c % 3 == 0: tensor = tensor.view(-1, 3, w, h)
-    else: raise ValueError("The number of channels must be multiple of 3.")
+    elif c != 3: tensor = tensor[:,ch,:,:].unsqueeze(dim=1)
 
     grid = utils.make_grid(tensor, nrow=nrow, normalize=True, padding=padding)
     # return grid
@@ -20,7 +20,7 @@ def conv_weight2img(tensor:Tensor4D, ch:int=0, allkernels:bool=False, nrow:int=8
     return grid.permute(1,2,0)
 
 _axe2caxe = {}
-def draw_weight_map(fig:Figure, axe:_axes.Axes, weight_tensor:TensorImage):
+def draw_weight_map(fig:Figure, axe:_axes.Axes, weight_tensor:Image):
     pc = axe.imshow(weight_tensor) # type: ignore
     
     if id(axe) not in _axe2caxe:
