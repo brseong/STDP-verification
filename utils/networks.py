@@ -12,12 +12,13 @@ from .SpykeTorch.SpykeTorch import snn, utils
 from .SpykeTorch.SpykeTorch import functional as sf
 
 from typeguard import typechecked
-from typing import Any, Callable, Generator, cast
+from typing import Callable, cast
 from abc import abstractmethod, ABCMeta
+from torchtyping import TensorType as Tensor
 
-from .types import Tensor2D
+from .types import Tensor2D, Tensor4D, Image
 from .dataclasses import DistInfo
-from .visual import tensor2img
+from .visual import conv_weight2img
 
 
 class LIFNeuron(neuron.SimpleLIFNode):
@@ -53,19 +54,19 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
 class Mozafari2018(STDPNet):
     draw_ids = (0, 1, 2)
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs) # type: ignore
         
         self.conv1 = snn.Convolution(6, 30, 5, 0.8, 0.05)
         self.conv1_t = 15
         self.k1 = 5
         self.r1 = 3
 
-        self.conv2 = snn.Convolution(30, 250, 3, 0.8, 0.05)
+        self.conv2 = snn.Convolution(30, 240, 3, 0.8, 0.05)
         self.conv2_t = 10
         self.k2 = 8
         self.r2 = 1
 
-        self.conv3 = snn.Convolution(250, 200, 5, 0.8, 0.05)
+        self.conv3 = snn.Convolution(240, 200, 5, 0.8, 0.05)
 
         self.stdp1 = snn.STDP(self.conv1, (0.004, -0.003))
         self.stdp2 = snn.STDP(self.conv2, (0.004, -0.003))
@@ -73,7 +74,7 @@ class Mozafari2018(STDPNet):
         self.anti_stdp3 = snn.STDP(self.conv3, (-0.004, 0.0005), False, 0.2, 0.8)
         self.max_ap = Parameter(torch.Tensor([0.15]))
 
-        self.decision_map = []
+        self.decision_map:list[int] = []
         for i in range(10):
             self.decision_map.extend([i]*20)
 
@@ -81,10 +82,11 @@ class Mozafari2018(STDPNet):
         self.spk_cnt1 = 0
         self.spk_cnt2 = 0
         
-    def forward(self, input:torch.Tensor, max_layer:int):
-        input = sf.pad(input.float(), (2,2,2,2), 0)
+    def forward(self, input:Tensor["batch", "timesteps", "channels1", "height1", "width1"], max_layer:int):
+        _input = sf.pad(input.float(), (2,2,2,2), 0)
         if self.training:
-            pot = self.conv1(input)
+            pot:Tensor["batch", "timesteps", "channels2", "height2", "width2"]
+            pot = self.conv1(_input)
             spk, pot = sf.fire(pot, self.conv1_t, True)
             if max_layer == 1:
                 self.spk_cnt1 += 1
@@ -97,7 +99,7 @@ class Mozafari2018(STDPNet):
                 pot = sf.pointwise_inhibition(pot)
                 spk = pot.sign()
                 winners = sf.get_k_winners(pot, self.k1, self.r1, spk)
-                self.ctx["input_spikes"] = input
+                self.ctx["input_spikes"] = _input
                 self.ctx["potentials"] = pot
                 self.ctx["output_spikes"] = spk
                 self.ctx["winners"] = winners
@@ -134,7 +136,7 @@ class Mozafari2018(STDPNet):
                 output = self.decision_map[winners[0][0]]
             return output
         else:
-            pot = self.conv1(input)
+            pot = self.conv1(_input)
             spk, pot = sf.fire(pot, self.conv1_t, True)
             if max_layer == 1:
                 return spk, pot
@@ -169,20 +171,33 @@ class Mozafari2018(STDPNet):
     def post_optim(self) -> None:
         pass
     
-    def draw_weights(self, id:int=0) -> Tensor2D:
-        assert id in self.draw_ids
-        weight = [self.conv1, self.conv2, self.conv3][id].weight.cpu().detach().clone()
-        return cast(Tensor2D, tensor2img(weight, allkernels=True))
+    def draw_weights(self, id:int=0) -> Image:
+        if id in self.draw_ids:
+            conv = [self.conv1, self.conv2, self.conv3][id]
+            nrow = [12, 50, 160][id]
+        else:
+            raise ValueError("Weight id is not valid.")
+        # Get first 3 convolution kernels' weights.
+        weight:Tensor4D = conv.weight.detach().cpu().clone()
+        assert len(weight.shape)==4
+        weight = weight[:,:3]
+        return conv_weight2img(weight, nrow=nrow, padding=1)
     
     @staticmethod
     def generate_transform():
+        """Applies difference of gaussian filters and temporal encoding. 6 DoG kernels are applied to image data, and returns data with 6 channels and 15 time steps.
+        E.g. With MNIST, Image is converted to (15, 6, 28, 28) Tensor.
+
+        Returns:
+            _type_: S1C1Transform object
+        """
         class S1C1Transform:
-            def __init__(self, filter:utils.Filter, timesteps = 15):
+            def __init__(self, filter:utils.Filter, timesteps:int = 15):
                 self.to_tensor = transforms.ToTensor()
                 self.filter = filter
                 self.temporal_transform = utils.Intensity2Latency(timesteps)
                 self.cnt = 0
-            def __call__(self, image):
+            def __call__(self, image:torch.Tensor):
                 if self.cnt % 1000 == 0:
                     print(self.cnt)
                 self.cnt+=1
@@ -203,15 +218,15 @@ class Mozafari2018(STDPNet):
         return S1C1Transform(filter)
     
     @staticmethod
-    def f_weight(x) -> torch.Tensor:
+    def f_weight(x:torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
     
     @staticmethod
-    def f_pre(x, w_min, alpha=0.) -> float:
+    def f_pre(x:torch.Tensor, w_min:float, alpha:float=0.) -> float:
         raise NotImplementedError
 
     @staticmethod
-    def f_post(x, w_max, alpha=0.) -> float:
+    def f_post(x:torch.Tensor, w_max:float, alpha:float=0.) -> float:
         raise NotImplementedError
 
 class DiehlAndCook2015(STDPNet):

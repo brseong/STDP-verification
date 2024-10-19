@@ -8,7 +8,7 @@ from .SpykeTorch.SpykeTorch import utils
 from .networks import Mozafari2018
 from .dataclasses import ExpInfo
 from .functions import Mozafari_train_rl, Mozafari_test, Mozafari_train_unsupervise
-from .types import Tensor2D
+from .types import Tensor2D, MNIST_DoG_Data, MNIST_DoG_Target
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -22,9 +22,13 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), shuffle=False)
 
     mozafari = Mozafari2018()
-    def draw_all_weights(): return tuple(mozafari.draw_weights(i) for i in range(3))
+    def draw_all_weights(): return (mozafari.draw_weights(0),mozafari.draw_weights(1),mozafari.draw_weights(2))
     if ExpInfo.use_cuda:
         mozafari.cuda()
+        
+    print(mozafari.conv1.weight.shape)
+    print(mozafari.conv2.weight.shape)
+    print(mozafari.conv3.weight.shape)
     
     # Training The First Layer
     print("Training the first layer")
@@ -79,10 +83,11 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     for epoch in range(680):
         print("Epoch #:", epoch)
         perf_train = np.array([0.0,0.0,0.0])
-        for data,targets in MNIST_loader:
+        data:MNIST_DoG_Data; targets:MNIST_DoG_Target
+        for data, targets in MNIST_loader:
             perf_train_batch = Mozafari_train_rl(mozafari, data, targets)
+            assert data.shape[1:] == (15,6,28,28)
             yield draw_all_weights()
-            print(perf_train_batch)
             #update adaptive learning rates
             apr_adapt = apr * (perf_train_batch[1] * adaptive_int + adaptive_min)
             anr_adapt = anr * (perf_train_batch[1] * adaptive_int + adaptive_min)

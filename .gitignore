@@ -164,7 +164,9 @@ cython_debug/
 # STDP Verification
 MNIST/
 data/
+out_img/
 
 data_sample.gif
 stdp_trace.pdf
 saved*.net
+*.mp4

@@ -7,3 +7,5 @@ scipy
 tensorboard
 mnist
 torchtyping
+jax
+jaxtyping
