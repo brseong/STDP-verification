@@ -174,7 +174,7 @@ class Mozafari2018(STDPNet):
     def draw_weights(self, id:int=0) -> Image:
         if id in self.draw_ids:
             conv = [self.conv1, self.conv2, self.conv3][id]
-            nrow = [12, 50, 160][id]
+            nrow = [10, 24, 25][id]
         else:
             raise ValueError("Weight id is not valid.")
         # Get first 3 convolution kernels' weights.
