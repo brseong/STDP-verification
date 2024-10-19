@@ -16,7 +16,7 @@ from typing import Callable, cast
 from abc import abstractmethod, ABCMeta
 from torchtyping import TensorType as Tensor
 
-from .types import Tensor2D, Tensor4D, Image
+from .types import Tensor2D, Tensor4D, TensorImage
 from .dataclasses import DistInfo
 from .visual import conv_weight2img
 
@@ -152,7 +152,7 @@ class Mozafari2018(STDPNet):
                 output = self.decision_map[winners[0][0]]
             return output
     
-    def stdp(self, layer_idx):
+    def stdp(self, layer_idx:int):
         if layer_idx == 1:
             self.stdp1(self.ctx["input_spikes"], self.ctx["potentials"], self.ctx["output_spikes"], self.ctx["winners"])
         if layer_idx == 2:
@@ -171,16 +171,16 @@ class Mozafari2018(STDPNet):
     def post_optim(self) -> None:
         pass
     
-    def draw_weights(self, id:int=0) -> Image:
+    def draw_weights(self, id:int=0) -> TensorImage:
         if id in self.draw_ids:
             conv = [self.conv1, self.conv2, self.conv3][id]
-            nrow = [10, 24, 25][id]
+            nrow = [10, 80, 160][id]
         else:
             raise ValueError("Weight id is not valid.")
         # Get first 3 convolution kernels' weights.
-        weight:Tensor4D = conv.weight.detach().cpu().clone()
+        weight:Tensor4D = conv.weight
         assert len(weight.shape)==4
-        weight = weight[:,:3]
+        # weight = weight.view(-1,3,*weight.shape[2:])
         return conv_weight2img(weight, nrow=nrow, padding=1)
     
     @staticmethod
