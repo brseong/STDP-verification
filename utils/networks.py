@@ -1,8 +1,11 @@
+import pdb
+import PIL
 import torch
 
 from torch import nn
 from torch.nn import Parameter
 from torchvision import transforms
+from PIL.Image import Image as PILImage
 import matplotlib.pyplot as plt
 
 from .spikingjelly.spikingjelly.activation_based import layer, learning, neuron
@@ -185,7 +188,8 @@ class Mozafari2018(STDPNet):
     
     @staticmethod
     def generate_transform():
-        """Applies difference of gaussian filters and temporal encoding. 6 DoG kernels are applied to image data, and returns data with 6 channels and 15 time steps.
+        """Applies difference of gaussian filters and temporal encoding to 1 channel image.
+        6 DoG kernels are applied to image data, and returns data with 6 channels and 15 time steps by default.
         E.g. With MNIST, Image is converted to (15, 6, 28, 28) Tensor.
 
         Returns:
@@ -196,13 +200,13 @@ class Mozafari2018(STDPNet):
                 self.to_tensor = transforms.ToTensor()
                 self.filter = filter
                 self.temporal_transform = utils.Intensity2Latency(timesteps)
-                self.cnt = 0
-            def __call__(self, image:torch.Tensor):
+                # self.cnt = 0
+            def __call__(self, _image:PILImage) -> torch.Tensor:
                 # if self.cnt % 1000 == 0:
                 #     print(self.cnt)
-                self.cnt+=1
-                image = self.to_tensor(image) * 255
-                image.unsqueeze_(0)
+                # self.cnt+=1
+                image = self.to_tensor(_image) * 255 # 1hw
+                image.unsqueeze_(0) # 1hw -> 11hw
                 image = self.filter(image)
                 image = sf.local_normalization(image, 8)
                 temporal_image = self.temporal_transform(image)
