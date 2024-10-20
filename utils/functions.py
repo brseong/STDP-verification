@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from .dataclasses import ExpInfo
-from .networks import STDPNet, Mozafari2018
+from .networks import Mozafari2018
 
 def Mozafari_train_unsupervise(network:Mozafari2018, data:torch.Tensor, layer_idx:int):
     network.train()

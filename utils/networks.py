@@ -198,8 +198,8 @@ class Mozafari2018(STDPNet):
                 self.temporal_transform = utils.Intensity2Latency(timesteps)
                 self.cnt = 0
             def __call__(self, image:torch.Tensor):
-                if self.cnt % 1000 == 0:
-                    print(self.cnt)
+                # if self.cnt % 1000 == 0:
+                #     print(self.cnt)
                 self.cnt+=1
                 image = self.to_tensor(image) * 255
                 image.unsqueeze_(0)

@@ -2,6 +2,7 @@ import torch, torchvision, os
 import numpy as np
 from typing import Generator
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
 
 from .SpykeTorch.SpykeTorch import utils
 
@@ -18,8 +19,8 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     s1c1 = Mozafari2018.generate_transform()
     MNIST_train = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=True, download=True, transform = s1c1))
     MNIST_test = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=False, download=True, transform = s1c1))
-    MNIST_loader = DataLoader(MNIST_train, batch_size=1000, shuffle=False)
-    MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), shuffle=False)
+    MNIST_loader = DataLoader(MNIST_train, batch_size=1024, num_workers=128, shuffle=False, pin_memory=True)
+    MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), num_workers=128, shuffle=False, pin_memory=True)
 
     mozafari = Mozafari2018()
     def draw_all_weights(): return (mozafari.draw_weights(0),mozafari.draw_weights(1),mozafari.draw_weights(2))
@@ -35,14 +36,12 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     if os.path.isfile("saved_l1.net"):
         mozafari.load_state_dict(torch.load("saved_l1.net"))
     else:
-        for epoch in range(2):
-            print("Epoch", epoch)
+        for epoch in (pbar:=tqdm(range(2))):
             iter = 0
-            for data,targets in MNIST_loader:
-                print("Iteration", iter)
+            for data,targets in tqdm(MNIST_loader, leave=False):
+                pbar.set_description(f"Epoch {epoch}, Iteration {iter}")
                 Mozafari_train_unsupervise(mozafari, data, 1)
                 yield draw_all_weights()
-                print("Done!")
                 iter+=1
         torch.save(mozafari.state_dict(), "saved_l1.net")
     # Training The Second Layer
@@ -50,14 +49,12 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     if os.path.isfile("saved_l2.net"):
         mozafari.load_state_dict(torch.load("saved_l2.net"))
     else:
-        for epoch in range(4):
-            print("Epoch", epoch)
+        for epoch in (pbar:=tqdm(range(4))):
             iter = 0
-            for data,targets in MNIST_loader:
-                print("Iteration", iter)
+            for data,targets in tqdm(MNIST_loader, leave=False):
+                pbar.set_description(f"Epoch {epoch}, Iteration {iter}")
                 Mozafari_train_unsupervise(mozafari, data, 2)
                 yield draw_all_weights()
-                print("Done!")
                 iter+=1
         torch.save(mozafari.state_dict(), "saved_l2.net")
 
@@ -80,11 +77,11 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
 
     # Training The Third Layer
     print("Training the third layer")
-    for epoch in range(680):
-        print("Epoch #:", epoch)
+    for epoch in tqdm(range(680)):
+        pbar.set_description(f"Epoch {epoch}, Current Train: {best_train[0]}, Best Train: {best_train[0]}, Current Test: {best_test[0]}, Best Test: {best_test[0]}")
         perf_train = np.array([0.0,0.0,0.0])
         data:MNIST_DoG_Data; targets:MNIST_DoG_Target
-        for data, targets in MNIST_loader:
+        for data, targets in tqdm(MNIST_loader, leave=False):
             perf_train_batch = Mozafari_train_rl(mozafari, data, targets)
             assert data.shape[1:] == (15,6,28,28)
             yield draw_all_weights()
@@ -101,7 +98,7 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
         print("Current Train:", perf_train)
         print("   Best Train:", best_train)
 
-        for data,targets in MNIST_testLoader:
+        for data,targets in tqdm(MNIST_testLoader, leave=False):
             perf_test = Mozafari_test(mozafari, data, targets)
             if best_test[0] <= perf_test[0]:
                 best_test = np.append(perf_test, epoch)
