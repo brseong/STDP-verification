@@ -77,7 +77,7 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
 
     # Training The Third Layer
     print("Training the third layer")
-    for epoch in tqdm(range(680)):
+    for epoch in (pbar:=tqdm(range(680))):
         pbar.set_description(f"Epoch {epoch}, Current Train: {best_train[0]}, Best Train: {best_train[0]}, Current Test: {best_test[0]}, Best Test: {best_test[0]}")
         perf_train = np.array([0.0,0.0,0.0])
         data:MNIST_DoG_Data; targets:MNIST_DoG_Target
