@@ -1,14 +1,19 @@
-import torch
-from .types import *
+from .networks import Mozafari2018, STDPNet
 from dataclasses import dataclass
-
-@dataclass
-class DistInfo:
-    min:float = NotImplemented
-    max:float = NotImplemented
-    mean:float = NotImplemented
-    std:float = NotImplemented
     
 @dataclass
-class ExpInfo:
+class ExperimentInfoGlobal:
     use_cuda:bool = True
+    log_dir:str = "log"
+
+global expr_info
+expr_info_global = ExperimentInfoGlobal()
+
+@dataclass
+class ExperimentInfoLocal:
+    log_name:str = "log"
+    num_steps:int = 15
+    net_type:type[STDPNet] = Mozafari2018
+    seed:int = 42
+    delta:int = 1
+    data_root:str = "data/"

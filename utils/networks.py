@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import pdb
 import PIL
 import torch
@@ -14,13 +15,11 @@ from .spikingjelly.spikingjelly.activation_based.surrogate import Sigmoid
 from .SpykeTorch.SpykeTorch import snn, utils
 from .SpykeTorch.SpykeTorch import functional as sf
 
-from typeguard import typechecked
-from typing import Callable, cast
+from typing import Annotated, Callable, cast
 from abc import abstractmethod, ABCMeta
 from torchtyping import TensorType as Tensor
 
 from .types import Tensor2D, Tensor4D, Image
-from .dataclasses import DistInfo
 from .visual import conv_weight2img
 
 
@@ -44,6 +43,10 @@ class STDPNet(nn.Module, metaclass=ABCMeta):
     
     @staticmethod
     @abstractmethod
+    def generate_transform() -> Callable[[PILImage], torch.Tensor]|None: pass
+    
+    @staticmethod
+    @abstractmethod
     def f_weight(x) -> torch.Tensor: pass
     
     @staticmethod
@@ -60,12 +63,12 @@ class Mozafari2018(STDPNet):
         super().__init__(*args, **kwargs) # type: ignore
         
         self.conv1 = snn.Convolution(6, 30, 5, 0.8, 0.05)
-        self.conv1_t = 15
+        self.conv1_thr = 15
         self.k1 = 5
         self.r1 = 3
 
         self.conv2 = snn.Convolution(30, 240, 3, 0.8, 0.05)
-        self.conv2_t = 10
+        self.conv2_thr = 10
         self.k2 = 8
         self.r2 = 1
 
@@ -85,12 +88,13 @@ class Mozafari2018(STDPNet):
         self.spk_cnt1 = 0
         self.spk_cnt2 = 0
         
-    def forward(self, input:Tensor["batch", "timesteps", "channels1", "height1", "width1"], max_layer:int):
+    def forward(self, input:Annotated[torch.Tensor, "timesteps channels height width"], max_layer:int):
         _input = sf.pad(input.float(), (2,2,2,2), 0)
         if self.training:
-            pot:Tensor["batch", "timesteps", "channels2", "height2", "width2"]
-            pot = self.conv1(_input)
-            spk, pot = sf.fire(pot, self.conv1_t, True)
+            pot:Annotated[torch.Tensor, "timesteps channels height width"]
+            pot = self.conv1(_input) # 15, 6, 28, 28 -> 15, 30, 28, 28
+            # print("First hidden:", pot.shape)
+            spk, pot = sf.fire(pot, self.conv1_thr) # 15, 30, 28, 28 -> (15, 30, 28, 28), (15, 30, 28, 28)
             if max_layer == 1:
                 self.spk_cnt1 += 1
                 if self.spk_cnt1 >= 500:
@@ -108,8 +112,9 @@ class Mozafari2018(STDPNet):
                 self.ctx["winners"] = winners
                 return spk, pot
             spk_in = sf.pad(sf.pooling(spk, 2, 2), (1,1,1,1))
-            pot = self.conv2(spk_in)
-            spk, pot = sf.fire(pot, self.conv2_t, True)
+            pot = self.conv2(spk_in) # 15, 30, 28, 28 -> 15, 240, 14, 14
+            # print("Second hidden:", pot.shape)
+            spk, pot = sf.fire(pot, self.conv2_thr) # 15, 240, 14, 14 -> (15, 240, 14, 14), (15, 240, 14, 14)
             if max_layer == 2:
                 self.spk_cnt2 += 1
                 if self.spk_cnt2 >= 500:
@@ -127,8 +132,9 @@ class Mozafari2018(STDPNet):
                 self.ctx["winners"] = winners
                 return spk, pot
             spk_in = sf.pad(sf.pooling(spk, 3, 3), (2,2,2,2))
-            pot = self.conv3(spk_in)
-            spk = sf.fire(pot)
+            pot = self.conv3(spk_in) # 15, 240, 14, 14 -> 15, 200, 4, 4
+            # print("Third hidden:", pot.shape)
+            spk, _ = sf.fire(pot) # 15, 200, 4, 4 -> 15, 200, 4, 4
             winners = sf.get_k_winners(pot, 1, 0, spk)
             self.ctx["input_spikes"] = spk_in
             self.ctx["potentials"] = pot
@@ -140,11 +146,11 @@ class Mozafari2018(STDPNet):
             return output
         else:
             pot = self.conv1(_input)
-            spk, pot = sf.fire(pot, self.conv1_t, True)
+            spk, pot = sf.fire(pot, self.conv1_thr, True)
             if max_layer == 1:
                 return spk, pot
             pot = self.conv2(sf.pad(sf.pooling(spk, 2, 2), (1,1,1,1)))
-            spk, pot = sf.fire(pot, self.conv2_t, True)
+            spk, pot = sf.fire(pot, self.conv2_thr, True)
             if max_layer == 2:
                 return spk, pot
             pot = self.conv3(sf.pad(sf.pooling(spk, 3, 3), (2,2,2,2)))
@@ -207,9 +213,9 @@ class Mozafari2018(STDPNet):
                 # self.cnt+=1
                 image = self.to_tensor(_image) * 255 # 1hw
                 image.unsqueeze_(0) # 1hw -> 11hw
-                image = self.filter(image)
-                image = sf.local_normalization(image, 8)
-                temporal_image = self.temporal_transform(image)
+                image = self.filter(image) # 11hw -> 1chw (c=6)
+                image = sf.local_normalization(image, 8) # 1chw -> 1chw (c=6)
+                temporal_image = self.temporal_transform(image) # 1chw -> tchw (t=15, c=6)
                 return temporal_image.sign().byte()
 
         kernels = [ utils.DoGKernel(3,3/9,6/9),
@@ -233,6 +239,14 @@ class Mozafari2018(STDPNet):
     def f_post(x:torch.Tensor, w_max:float, alpha:float=0.) -> float:
         raise NotImplementedError
 
+
+@dataclass
+class DistInfo:
+    min:float = NotImplemented
+    max:float = NotImplemented
+    mean:float = NotImplemented
+    std:float = NotImplemented
+    
 class DiehlAndCook2015(STDPNet):
     draw_ids = (0,1)
     def __init__(
@@ -292,7 +306,6 @@ class DiehlAndCook2015(STDPNet):
     def f_post(x, w_max, alpha=0.) -> float:
         return (w_max - x) ** alpha
     
-    @typechecked
     def draw_weights(self, id:int=0) -> Tensor2D:
         assert id in self.draw_ids
         target = [self.excitatory, self.inhibitory][id]

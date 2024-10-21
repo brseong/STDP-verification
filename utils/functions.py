@@ -1,14 +1,14 @@
 import torch
 import numpy as np
 
-from .dataclasses import ExpInfo
+from .dataclasses import expr_info_global
 from .networks import Mozafari2018
 
 def Mozafari_train_unsupervise(network:Mozafari2018, data:torch.Tensor, layer_idx:int):
     network.train()
     for i in range(len(data)):
         data_in = data[i]
-        if ExpInfo.use_cuda:
+        if expr_info_global.use_cuda:
             data_in = data_in.cuda()
         network(data_in, layer_idx)
         network.stdp(layer_idx)
@@ -19,7 +19,7 @@ def Mozafari_train_rl(network:Mozafari2018, data:torch.Tensor, target:torch.Tens
     for i in range(len(data)):
         data_in = data[i]
         target_in = target[i]
-        if ExpInfo.use_cuda:
+        if expr_info_global.use_cuda:
             data_in = data_in.cuda()
             target_in = target_in.cuda()
         d = network(data_in, 3)
@@ -40,7 +40,7 @@ def Mozafari_test(network:Mozafari2018, data:torch.Tensor, target:torch.Tensor):
     for i in range(len(data)):
         data_in = data[i]
         target_in = target[i]
-        if ExpInfo.use_cuda:
+        if expr_info_global.use_cuda:
             data_in = data_in.cuda()
             target_in = target_in.cuda()
         d = network(data_in, 3)

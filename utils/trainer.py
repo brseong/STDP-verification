@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 from .SpykeTorch.SpykeTorch import utils
 
 from .networks import Mozafari2018
-from .dataclasses import ExpInfo
+from .dataclasses import expr_info_global
 from .functions import Mozafari_train_rl, Mozafari_test, Mozafari_train_unsupervise
 from .types import Tensor2D, MNIST_DoG_Data, MNIST_DoG_Target
 
@@ -19,12 +19,12 @@ def train_Mozafari() -> Generator[tuple[Tensor2D,...], None, None]:
     s1c1 = Mozafari2018.generate_transform()
     MNIST_train = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=True, download=True, transform = s1c1))
     MNIST_test = utils.CacheDataset(torchvision.datasets.MNIST(root=data_root, train=False, download=True, transform = s1c1))
-    MNIST_loader = DataLoader(MNIST_train, batch_size=1024, num_workers=1, shuffle=False, pin_memory=True)
+    MNIST_loader = DataLoader(MNIST_train, batch_size=1024, num_workers=128, shuffle=False, pin_memory=True)
     MNIST_testLoader = DataLoader(MNIST_test, batch_size=len(MNIST_test), num_workers=128, shuffle=False, pin_memory=True)
 
     mozafari = Mozafari2018()
     def draw_all_weights(): return (mozafari.draw_weights(0),mozafari.draw_weights(1),mozafari.draw_weights(2))
-    if ExpInfo.use_cuda:
+    if expr_info_global.use_cuda:
         mozafari.cuda()
         
     print(mozafari.conv1.weight.shape)

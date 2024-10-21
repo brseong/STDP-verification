@@ -165,6 +165,7 @@ cython_debug/
 MNIST/
 data/
 out_img/*
+log/
 
 data_sample.gif
 stdp_trace.pdf
