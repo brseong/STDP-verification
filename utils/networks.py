@@ -146,15 +146,15 @@ class Mozafari2018(STDPNet):
             return output
         else:
             pot = self.conv1(_input)
-            spk, pot = sf.fire(pot, self.conv1_thr, True)
+            spk, pot = sf.fire(pot, self.conv1_thr)
             if max_layer == 1:
                 return spk, pot
             pot = self.conv2(sf.pad(sf.pooling(spk, 2, 2), (1,1,1,1)))
-            spk, pot = sf.fire(pot, self.conv2_thr, True)
+            spk, pot = sf.fire(pot, self.conv2_thr)
             if max_layer == 2:
                 return spk, pot
             pot = self.conv3(sf.pad(sf.pooling(spk, 3, 3), (2,2,2,2)))
-            spk = sf.fire(pot)
+            spk, _ = sf.fire(pot)
             winners = sf.get_k_winners(pot, 1, 0, spk)
             output = -1
             if len(winners) != 0:
