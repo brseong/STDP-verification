@@ -5,7 +5,8 @@ from jaxtyping import Float, Int, UInt8
 
 Tensor2D:TypeAlias = Annotated[Tensor, "height width"]
 Tensor3D:TypeAlias = Annotated[Tensor, "channel height width"]
-Tensor4D:TypeAlias = Annotated[Tensor, "in_channel out_channel height width"]
+Tensor4D:TypeAlias = Annotated[Tensor, "* out_channel height width"]
+TensorHidden:TypeAlias = Annotated[Tensor, "timestep channel height width"]
 Image:TypeAlias = Annotated[Tensor, "3 height width"]
 
 NMNIST_Data:TypeAlias = Annotated[Tensor, "timestep 2 34 34", torch.float]

@@ -1,6 +1,6 @@
 import torch, torchvision, os
 import numpy as np
-from typing import Generator
+from collections.abc import Generator
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
