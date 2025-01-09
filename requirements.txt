@@ -1,4 +1,5 @@
-torch
+torch --index-url --index-url https://download.pytorch.org/whl/cu124
+torchvision
 matplotlib
 numpy
 tqdm
